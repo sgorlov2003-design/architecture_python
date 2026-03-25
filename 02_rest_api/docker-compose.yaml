@@ -1,0 +1,49 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        INSTALL_MODE: ${INSTALL_MODE:-online}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-}
+    container_name: fitness-tracker-api
+    ports:
+      - "8080:8080"
+    environment:
+      - JWT_SECRET_KEY=fitness-tracker-secret-2025
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/', timeout=3)",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - ft-network
+
+  swagger-ui:
+    image: swaggerapi/swagger-ui:latest
+    container_name: fitness-tracker-swagger
+    ports:
+      - "8081:8080"
+    environment:
+      - SWAGGER_JSON=/openapi.yaml
+    volumes:
+      - ./openapi.yaml:/openapi.yaml:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - ft-network
+
+networks:
+  ft-network:
+    driver: bridge
+    name: fitness-tracker-network

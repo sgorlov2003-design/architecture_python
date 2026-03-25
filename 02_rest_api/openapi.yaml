@@ -1,0 +1,437 @@
+openapi: 3.0.0
+info:
+  title: Фитнес-трекер API
+  description: |
+    REST API для учёта тренировок и упражнений (вариант 14, ДЗ 02).
+    Аутентификация: JWT Bearer. В Swagger UI — **Authorize** с токеном из `POST /token`
+    (username = логин, password = пароль).
+  version: "1.0.0"
+
+servers:
+  - url: http://localhost:8080
+    description: API (docker compose — сервис api)
+
+tags:
+  - name: auth
+    description: Регистрация и выдача JWT
+  - name: users
+    description: Пользователи (публичный поиск)
+  - name: exercises
+    description: Справочник упражнений
+  - name: workouts
+    description: Тренировки (требуется Bearer)
+
+paths:
+  /users:
+    post:
+      tags: [auth]
+      summary: Создание нового пользователя
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserCreate"
+            example:
+              login: ivan
+              password: secret
+              first_name: Иван
+              last_name: Иванов
+      responses:
+        "201":
+          description: Пользователь создан
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "409":
+          description: Пользователь с таким логином уже существует
+
+  /token:
+    post:
+      tags: [auth]
+      summary: OAuth2 password — получение JWT
+      description: |
+        `application/x-www-form-urlencoded`: `username` = логин, `password` = пароль.
+        В Swagger UI кнопка **Authorize** использует этот endpoint.
+      operationId: tokenOAuth2
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                  description: Логин пользователя
+                password:
+                  type: string
+                  format: password
+      responses:
+        "200":
+          description: Токен выдан
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "401":
+          description: Неверный логин или пароль
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Логин JSON — получение JWT
+      operationId: loginJson
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserLogin"
+            example:
+              login: ivan
+              password: secret
+      responses:
+        "200":
+          description: Токен выдан
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TokenResponse"
+        "401":
+          description: Неверный логин или пароль
+
+  /users/by-login/{login}:
+    get:
+      tags: [users]
+      summary: Поиск пользователя по логину
+      operationId: getUserByLogin
+      parameters:
+        - name: login
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Пользователь найден
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+        "404":
+          description: Пользователь не найден
+
+  /users/search:
+    get:
+      tags: [users]
+      summary: Поиск пользователей по маске имя и фамилия
+      operationId: searchUsers
+      parameters:
+        - name: name_mask
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Подстрока в «Имя Фамилия» (без маски — все пользователи)
+      responses:
+        "200":
+          description: Список пользователей
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserResponse"
+
+  /exercises:
+    get:
+      tags: [exercises]
+      summary: Список упражнений
+      operationId: listExercises
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ExerciseResponse"
+    post:
+      tags: [exercises]
+      summary: Создание упражнения
+      operationId: createExercise
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExerciseCreate"
+            example:
+              name: Жим лёжа
+              description: Грудь, трицепс
+      responses:
+        "201":
+          description: Упражнение создано
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExerciseResponse"
+
+  /exercises/{exercise_id}:
+    get:
+      tags: [exercises]
+      summary: Упражнение по id
+      operationId: getExercise
+      parameters:
+        - name: exercise_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExerciseResponse"
+        "404":
+          description: Упражнение не найдено
+    patch:
+      tags: [exercises]
+      summary: Частичное обновление упражнения
+      operationId: patchExercise
+      parameters:
+        - name: exercise_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExerciseUpdate"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExerciseResponse"
+        "404":
+          description: Упражнение не найдено
+    delete:
+      tags: [exercises]
+      summary: Удаление упражнения
+      operationId: deleteExercise
+      parameters:
+        - name: exercise_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Удалено
+        "404":
+          description: Упражнение не найдено
+
+  /workouts:
+    post:
+      tags: [workouts]
+      summary: Создание тренировки
+      description: Требуется JWT (middleware + Depends).
+      security: [bearerAuth]
+      operationId: createWorkout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkoutCreate"
+            example:
+              name: Силовая
+              date: "2025-03-18"
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkoutResponse"
+        "401":
+          description: Требуется аутентификация
+
+  /workouts/{workout_id}/exercises:
+    post:
+      tags: [workouts]
+      summary: Добавить упражнение в тренировку
+      security: [bearerAuth]
+      operationId: addExerciseToWorkout
+      parameters:
+        - name: workout_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExerciseToWorkout"
+            example:
+              exercise_id: "<uuid упражнения>"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkoutResponse"
+        "401":
+          description: Требуется аутентификация
+        "403":
+          description: Нет доступа к тренировке
+        "404":
+          description: Тренировка или упражнение не найдены
+
+  /users/me/workouts:
+    get:
+      tags: [workouts]
+      summary: История тренировок текущего пользователя
+      security: [bearerAuth]
+      operationId: getMyWorkouts
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkoutResponse"
+        "401":
+          description: Требуется аутентификация
+
+  /users/me/workouts/statistics:
+    get:
+      tags: [workouts]
+      summary: Статистика тренировок за период
+      security: [bearerAuth]
+      operationId: getWorkoutStatistics
+      parameters:
+        - name: period_start
+          in: query
+          schema:
+            type: string
+            example: "2025-01-01"
+        - name: period_end
+          in: query
+          schema:
+            type: string
+            example: "2025-12-31"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkoutStatistics"
+        "401":
+          description: Требуется аутентификация
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    UserCreate:
+      type: object
+      required: [login, password, first_name, last_name]
+      properties:
+        login: { type: string }
+        password: { type: string }
+        first_name: { type: string }
+        last_name: { type: string }
+
+    UserLogin:
+      type: object
+      required: [login, password]
+      properties:
+        login: { type: string }
+        password: { type: string }
+
+    UserResponse:
+      type: object
+      properties:
+        id: { type: string }
+        login: { type: string }
+        first_name: { type: string }
+        last_name: { type: string }
+
+    TokenResponse:
+      type: object
+      properties:
+        access_token: { type: string }
+        token_type:
+          type: string
+          example: bearer
+
+    ExerciseCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        description: { type: string, nullable: true }
+
+    ExerciseUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: string, nullable: true }
+
+    ExerciseResponse:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string, nullable: true }
+
+    ExerciseToWorkout:
+      type: object
+      required: [exercise_id]
+      properties:
+        exercise_id: { type: string }
+
+    WorkoutCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        date:
+          type: string
+          description: Дата YYYY-MM-DD; по умолчанию — сегодня (UTC)
+
+    WorkoutResponse:
+      type: object
+      properties:
+        id: { type: string }
+        user_id: { type: string }
+        name: { type: string }
+        date: { type: string }
+        exercise_ids:
+          type: array
+          items: { type: string }
+
+    WorkoutStatistics:
+      type: object
+      properties:
+        user_id: { type: string }
+        period_start: { type: string }
+        period_end: { type: string }
+        total_workouts: { type: integer }
+        total_exercises: { type: integer }
