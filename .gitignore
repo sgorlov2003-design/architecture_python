@@ -3,3 +3,7 @@ __pycache__/
 .pytest_cache/
 .structurizr/
 workspace.json
+.cursor/
+
+# Локальные выгрузки заданий из docx (не обязательны для сдачи)
+docs/

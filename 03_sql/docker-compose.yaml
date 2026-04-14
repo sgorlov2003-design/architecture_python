@@ -1,0 +1,79 @@
+services:
+  postgres:
+    image: postgres:14-alpine
+    container_name: fitness-tracker-postgres
+    environment:
+      POSTGRES_USER: fitness_user
+      POSTGRES_PASSWORD: fitness_password
+      POSTGRES_DB: fitness_tracker
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./sql/data.sql:/docker-entrypoint-initdb.d/02_data.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fitness_user -d fitness_tracker"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 10s
+    networks:
+      - ft-network
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        INSTALL_MODE: ${INSTALL_MODE:-online}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-}
+    container_name: fitness-tracker-api-db
+    ports:
+      - "8090:8080"
+    environment:
+      - JWT_SECRET_KEY=fitness-tracker-secret-2025
+      - DATABASE_URL=postgresql://fitness_user:fitness_password@postgres:5432/fitness_tracker
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/', timeout=3)",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 8
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - ft-network
+
+  swagger-ui:
+    image: swaggerapi/swagger-ui:latest
+    container_name: fitness-tracker-swagger-db
+    ports:
+      - "8091:8080"
+    environment:
+      - SWAGGER_JSON=/openapi.yaml
+    volumes:
+      - ./openapi.yaml:/openapi.yaml:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - ft-network
+
+networks:
+  ft-network:
+    driver: bridge
+    name: fitness-tracker-db-network
+
+volumes:
+  postgres_data:

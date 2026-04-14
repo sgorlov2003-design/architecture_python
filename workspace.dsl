@@ -91,7 +91,7 @@ workspace {
             autoLayout
         }
 
-        # Dynamic — создание тренировки (как у товарища: короткие номера шагов + протокол)
+        # Dynamic — создание тренировки (нумерация шагов и протоколы на связях)
         dynamic fitness_system "dynamic-create-workout" "Создание тренировки" {
             autoLayout
             description "Создание тренировки и загрузка списка упражнений через API Gateway (вариант 14)"
