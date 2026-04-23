@@ -1,0 +1,78 @@
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: fitness-tracker-mongodb
+    ports:
+      - "27018:27017"
+    environment:
+      MONGO_INITDB_DATABASE: fitness_tracker
+    volumes:
+      - mongo_data:/data/db
+      - ./validation.js:/docker-entrypoint-initdb.d/01_validation.js:ro
+      - ./data.js:/docker-entrypoint-initdb.d/02_data.js:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    networks:
+      - ft-mongo-network
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        INSTALL_MODE: ${INSTALL_MODE:-online}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-}
+    container_name: fitness-tracker-api-mongo
+    ports:
+      - "8092:8080"
+    environment:
+      - JWT_SECRET_KEY=fitness-tracker-secret-2025
+      - MONGO_URI=mongodb://mongodb:27017
+      - MONGO_DATABASE=fitness_tracker
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3)",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 8
+      start_period: 35s
+    restart: unless-stopped
+    networks:
+      - ft-mongo-network
+
+  swagger-ui:
+    image: swaggerapi/swagger-ui:latest
+    container_name: fitness-tracker-swagger-mongo
+    ports:
+      - "8094:8080"
+    environment:
+      - SWAGGER_JSON=/openapi.yaml
+    volumes:
+      - ./openapi.yaml:/openapi.yaml:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - ft-mongo-network
+
+networks:
+  ft-mongo-network:
+    driver: bridge
+    name: fitness-tracker-mongo-network
+
+volumes:
+  mongo_data:
