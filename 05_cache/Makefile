@@ -13,9 +13,11 @@ wheels:
 build-offline:
 	INSTALL_MODE=offline docker compose build
 
-# Требуется PostgreSQL (см. README): docker compose up -d postgres
 test:
 	python -m pytest tests/ -v
+
+docker-test:
+	docker compose exec api python -m pytest tests/ -v
 
 build-tests: build test
 

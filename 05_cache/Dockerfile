@@ -43,10 +43,13 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 COPY app ./app
 COPY main.py .
 COPY openapi.yaml ./openapi.yaml
+COPY tests ./tests
+
+RUN pip install --no-cache-dir pytest httpx
 
 EXPOSE 8080
 
 HEALTHCHECK --interval=5s --timeout=5s --start-period=25s --retries=8 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/', timeout=3)"
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3)"
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]

@@ -38,12 +38,18 @@ curl http://localhost:8095/health
 
 ## Тесты
 
+После `docker compose up -d --build`:
+
+```bash
+make docker-test
+```
+
+Локально (Python 3.11+, Postgres **5433**, Redis **6380**):
+
 ```bash
 pip install -r requirements-dev.txt
 make test
 ```
-
-Нужны PostgreSQL на порту **5433** и Redis на **6380** (как в compose).
 
 ---
 
