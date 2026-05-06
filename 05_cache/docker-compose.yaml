@@ -1,0 +1,97 @@
+services:
+  postgres:
+    image: postgres:14-alpine
+    container_name: fitness-tracker-postgres-cache
+    environment:
+      POSTGRES_USER: fitness_user
+      POSTGRES_PASSWORD: fitness_password
+      POSTGRES_DB: fitness_tracker
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_cache_data:/var/lib/postgresql/data
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./sql/data.sql:/docker-entrypoint-initdb.d/02_data.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fitness_user -d fitness_tracker"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 10s
+    networks:
+      - ft-cache-net
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: fitness-tracker-redis
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    networks:
+      - ft-cache-net
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        INSTALL_MODE: ${INSTALL_MODE:-online}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-}
+    container_name: fitness-tracker-api-cache
+    ports:
+      - "8095:8080"
+    environment:
+      - JWT_SECRET_KEY=fitness-tracker-secret-2025
+      - DATABASE_URL=postgresql://fitness_user:fitness_password@postgres:5432/fitness_tracker
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3)",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 8
+      start_period: 35s
+    restart: unless-stopped
+    networks:
+      - ft-cache-net
+
+  swagger-ui:
+    image: swaggerapi/swagger-ui:latest
+    container_name: fitness-tracker-swagger-cache
+    ports:
+      - "8096:8080"
+    environment:
+      - SWAGGER_JSON=/openapi.yaml
+    volumes:
+      - ./openapi.yaml:/openapi.yaml:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - ft-cache-net
+
+networks:
+  ft-cache-net:
+    driver: bridge
+    name: fitness-tracker-cache-network
+
+volumes:
+  postgres_cache_data:
