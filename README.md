@@ -126,6 +126,12 @@ Redis (кэш, rate limit), PostgreSQL, API: [05_cache](05_cache/README.md).
 
 ---
 
+## Домашнее задание 06
+
+Event-Driven архитектура, Kafka, CQRS, producer/consumer: [06_event_driven](06_event_driven/README.md).
+
+---
+
 **Автор:** Горлов Степан Николаевич М8О-106СВ-25
 
 **Вариант:** 14
